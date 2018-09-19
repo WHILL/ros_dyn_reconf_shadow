@@ -1,0 +1,8 @@
+<launch>
+
+    <node pkg="ros_aws_iot_bridge" name="shadow" type="shadow.py" output="screen">
+        <param name="host" value="a34uk7qqibplok.iot.us-east-1.amazonaws.com" />
+        <param name="thingName" value="IoT-Test0" />
+    </node>
+
+</launch>
