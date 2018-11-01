@@ -11,9 +11,9 @@ import rospy
 from shadowTool import shadowSyncClient
 from std_msgs.msg import String
 
-
-
 def shadowCallback(self,delta):
+    # Called by delta message published
+
     state = delta.get("state")
     if state:
         print(state)
