@@ -5,6 +5,7 @@ import sys
 import argparse
 import traceback
 from time import sleep
+import yaml
 
 # ROSpy and dynamic reconfigration
 import rospy
@@ -51,6 +52,16 @@ def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Recon
 rospy.init_node("aws_iot_bridge", anonymous = True)
 #rospy.Subscriber("/state", String, stateListnshadowRegisterDeltaCallbacker)
 
+
+dyn_config  = rospy.get_param("~dyn_reconf_args",os.path.dirname(__file__) + '/' + "../config/skelton.yaml") 
+
+rospy.loginfo(dyn_config)
+with open(dyn_config, 'rt') as fp:
+    yaml_text = fp.read()
+
+dyn_configs = yaml.safe_load(yaml_text).get("dyn_reconfigures")
+
+
 args = {}
 args["host"]            = rospy.get_param("~host")
 args["port"]            = rospy.get_param("~port",None)
@@ -60,8 +71,6 @@ args["clientId"]        = rospy.get_param("~clientId","ROS")
 args["certificatePath"] = rospy.get_param("~certificatePath", os.path.dirname(__file__) + '/' + "../certs/certificate.pem.crt")
 args["privateKeyPath"]  = rospy.get_param("~privateKeyPath", os.path.dirname(__file__) + '/' + "../certs/private.pem.key")
 args["rootCAPath"]      = rospy.get_param("~rootCAPath",os.path.dirname(__file__) + '/' + "../certs/rootCA.pem")
-
-
 
 
 while not rospy.is_shutdown():
@@ -78,11 +87,13 @@ while not rospy.is_shutdown():
 
         rospy.loginfo("Registering to Dynamic Reconfigure Server.")
         dynManager = dynClientsManager(dynCallback)
-        dynManager.add("dynamic_tutorials/testServer1",["int_param","str_param"])
-        dynManager.add("dynamic_tutorials/testServer2",["double_param"])
+
+        for name,args in dyn_configs.items():
+            dynManager.add(name,args)
 
         rospy.logwarn("Getting Configrations from dynamic reconfigure servers.")
 
+        # Publish initial state to Shadow
         initial_params = dynManager.get_configurations()
         shadow.report({'params':initial_params})
 
