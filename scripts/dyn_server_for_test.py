@@ -15,4 +15,5 @@ if __name__ == "__main__":
 
     srv1 = Server(TutorialsConfig, callback,namespace="testServer1")
     srv2 = Server(TutorialsConfig, callback,namespace="testServer2")
+    
     rospy.spin()
