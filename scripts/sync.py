@@ -26,6 +26,7 @@ def callChangeStateService(state):
     except rospy.ServiceException, e:
         rospy.logwarn("Service call failed: %s"%e)
 
+
 state = None
 def stateListener(data):
 
@@ -44,8 +45,7 @@ def stateListener(data):
             state = data.data
             stateListener.timestamp_before = datetime.now()
     except:
-        rospy.logwarn(sys.exc_info())
-
+        pass
     
 
 
@@ -64,21 +64,19 @@ def shadowDeltaCallback(self,delta):  # Callback for Thing Shadow Receives Delta
     if params and dynManager:
         for name,config in params.items():
             try:
-                rospy.logwarn("Delta Received '"+str(name)+"' to "+str(config))
-                dynManager.clients[name].update(config,True)
+                rospy.logwarn("Delta Received "+str(name)+" to "+str(config))
+                dynManager.clients[str(name)].update(config,True)
             except KeyError:
                 rospy.logerr("Request Ignored. Dynamic reconfigure server:"+str(name)+" is not registerd.")
             except:
-                rospy.logerr("Unknown error: "+str(sys.exc_info()))
+                rospy.logerr("Unknown error at "+str(name)+": "+str(sys.exc_info()))
             
                 
 def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Reconfigure Updated
-    rospy.loginfo("Dynamic Reconfigure Callback")
 
     try:
         if shadow and shadow.online:
-            rospy.loginfo("report to")
-            rospy.loginfo(str(name)+str(config))
+            rospy.loginfo("Reporting: "+str(name)+" to "+str(config))
             if isInitial:
                 shadow.report({'params':{name:config}})
             else:
@@ -134,20 +132,7 @@ while not rospy.is_shutdown():
         for name,args in dyn_configs.items():
             dynManager.add(name,args)
 
-        rospy.logwarn("Getting Configrations from dynamic reconfigure servers.")
-
-        # Publish initial state to Shadow
-        initial_params = dynManager.get_configurations()
-        shadow.report({'params':initial_params})
-
-        while not rospy.is_shutdown() and len(shadow.queue) != 0:
-            waiting_rate.sleep()
-
-        rospy.logwarn("Updated!!")
-        shadow.enable_delta_callback = True
-            
-        r = rospy.Rate(1.0/10.0)  # Delta get
-
+        r = rospy.Rate(1.0/5.0)
         while not rospy.is_shutdown():
             shadow.get()
             if shadow.online == False:

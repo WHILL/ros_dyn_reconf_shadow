@@ -90,9 +90,6 @@ class shadowSyncClient:
         self.__myAWSIoTMQTTShadowClient.connect()
 
         self.__reported = None
-        self.enable_delta_callback = False
-
-        self.queue = []
 
     def __online_callback(self):
         rospy.loginfo("AWS IoT Online")
@@ -125,7 +122,6 @@ class shadowSyncClient:
     def __update(self,state):
         rospy.loginfo("Updating Shadow to " + str(state))
         data = json.dumps({'state':state})
-        self.queue.append(state)
         self.handler.shadowUpdate(data, self.__updateCallback, 5)
 
     def __updateCallback(self, data, responseStatus, token):
@@ -140,10 +136,9 @@ class shadowSyncClient:
             rospy.logwarn("Update request " + token + " rejected!") 
 
         if responseStatus == "accepted":
-            rospy.loginfo("Shadow update request accepted:")
+            rospy.logdebug("Shadow update request accepted:")
             payload = json.loads(data)
             state = payload["state"]
-            self.queue.remove(state)
             reported = state.get("reported")
             if reported:
                 self.__reported = state.get("reported")
@@ -151,10 +146,7 @@ class shadowSyncClient:
 
     # Custom Shadow callback
     def __deltaCallback(self, data, responseStatus, token):
-        rospy.loginfo("Delta callback "+str(responseStatus))
 
-        if self.enable_delta_callback == False:
-            return
         # payload is a JSON string ready to be parsed using json.loads(...)
         payload = json.loads(data)
         if payload.has_key("state"):

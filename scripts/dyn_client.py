@@ -3,31 +3,77 @@
 import rospy
 
 from pprint import pprint
+import threading
+
+import sys
 
 import dynamic_reconfigure.client
 
+
 class dynClient:
-    def __init__(self,name,args,callback,combine=True):
+
+    def __init__(self,name,args,callback,connected_callback,combine=True):
         # @TODO Needs type check for arguments!
         self.name       = name
         self.args       = args
         self.__callback = callback
+        self.__connected_callback = connected_callback
         self.__combine  = combine
         self.__config   = {}
-        self.__client   = dynamic_reconfigure.client.Client(self.name, timeout=30)
         
-        self.__ignore_callback = True  # ignore the callback for timming of registering
-        self.__client.set_config_callback(self.__going_callback)
-
-        self.__initialized        = False
+        self.__status             = "Connecting"
         self.__callback_even_same = False
 
+        self.__has_initialized = False
+
+        # Connect to dynamic reconfigure server in another thread since the function is asyncronized.
+        self.__connection_thread = threading.Thread(target=self.connection_thread_process)
+        self.__connection_thread.start()
+
+
+    def connection_thread_process(self):
+        while True:
+            try:
+                self.__client   = dynamic_reconfigure.client.Client(self.name, timeout=30)
+
+                # Following codes run when connection succeess.
+                self.__ignore_callback = False  # ignore the callback for timming of registering
+                self.__client.set_config_callback(self.__going_callback)
+                self.__status = "Connected"
+                rospy.loginfo("Connected to dyn server:"+str(self.name)+".")
+                self.__connected_callback(self.name,self)
+                return  # Finish this thread when connected.
+
+            except:
+                # When connection timeout, retry.
+                rospy.logwarn("Trying to reconnect dyn server:"+str(self.name))
+
+    def is_connected(self):
+        if self.__status == "Connected":
+            return True
+        else:
+            return False
+
     def update(self,config,must_fire_callback=False):
+
         self.__callback_even_same = must_fire_callback
-        self.__client.update_configuration(config)
+
+        try:
+            self.__client.update_configuration(config)
+        except:
+            self.__status = "Disconnected"
+            rospy.logerr("Error at "+str(self.name)+" "+str(sys.exc_info()))
+
 
     def get_configurations(self,timeout=None):
-        return self.__client.get_configuration(timeout)
+
+        try:
+            return self.__client.get_configuration(timeout)
+        except:
+            self.__status = "Disconnected"
+            rospy.logerr("Error at "+str(self.name)+" "+str(sys.exc_info()))
+
+        return None
 
     def __filter_configs(self,config):
         lists = {}
@@ -41,36 +87,45 @@ class dynClient:
         if config is None:
             return   # If the dynamic reconfigure contains is empty.
 
+
+        if not self.is_connected():   # Recovering from disconnected
+            self.__callback_even_same = True
+            self.__has_initialized    = False
+            self.__config = {}   # Reset cache
+            self.__status = "Connected"
+
         if self.__ignore_callback is True:
             rospy.logdebug("Callback registering was Ignored.")
             self.__ignore_callback = False
             return
 
-        # Check something changed or remains
+
+        # Determine something changed compare to cache
         lists = self.__filter_configs(config)
         if (lists == self.__config) and not self.__callback_even_same:
-            rospy.logwarn("Dyn Callback not called due to same")
+            print("Dyn Callback not called due to same")
             self.__callback_even_same = False
             return    # If any of specified args is not changed
 
-        # Filter actual changed
+        # Find actual changed
         new_config = {}
         for k,v in lists.items():
             if not self.__config.has_key(k) or v != self.__config[k]:
                 new_config[k] = v
 
+        # Return if nothing changed
         if len(new_config) == 0:
             return
 
         self.__config = lists
 
-
         if self.__combine:
-            self.__callback({self.name:new_config},not self.__initialized)
+            
+            self.__callback({self.name:new_config},not self.__has_initialized)
         else:
-            self.__callback(self.name,new_config,not self.__initialized)
+            self.__callback(self.name,new_config,not self.__has_initialized)
 
-        self.__initialized = True
+        self.__has_initialized = True
         self.__callback_even_same = False
 
 
@@ -81,7 +136,9 @@ class dynClientsManager:
         self.__callback = callback
 
     def add(self,name,args):
-        client = dynClient(name,args,self.__clients_callback,False)
+        dynClient(name,args,self.__clients_callback,self.__client_connected_reception,False)
+
+    def __client_connected_reception(self,name,client):
         self.clients[name] = client
 
     def get_configurations(self):
