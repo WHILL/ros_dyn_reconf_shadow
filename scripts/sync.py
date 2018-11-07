@@ -6,16 +6,59 @@ import argparse
 import traceback
 from time import sleep
 import yaml
-
+from datetime import datetime
 # ROSpy and dynamic reconfigration
 import rospy
 from std_msgs.msg import String
+from std_srvs.srv import *
+
 
 from shadow import shadowSyncClient
 from dyn_client import dynClientsManager
 
 
+def callChangeStateService(state):
+    rospy.wait_for_service('/maintain/setState/'+str(state))
+    try:
+        changeState = rospy.ServiceProxy('/maintain/setState/'+str(state), Trigger)
+        resp = changeState()
+        return resp
+    except rospy.ServiceException, e:
+        rospy.logwarn("Service call failed: %s"%e)
+
+state = None
+def stateListener(data):
+
+    try:
+        stateListener.timestamp_before
+    except:
+        stateListener.timestamp_before = datetime.now()
+
+    # @TODO Need to consider a case of reconnect
+    try:
+        global state
+        global shadow
+        if shadow.online and (state != data.data or (datetime.now() - stateListener.timestamp_before).total_seconds() > 5):
+            rospy.loginfo('Report state:'+str(data.data))
+            shadow.report({'state':data.data})
+            state = data.data
+            stateListener.timestamp_before = datetime.now()
+    except:
+        rospy.logwarn(sys.exc_info())
+
+    
+
+
 def shadowDeltaCallback(self,delta):  # Callback for Thing Shadow Receives Delta
+
+    new_state = delta.get("state")
+    if new_state:
+        global state
+        rospy.loginfo("State delta:"+str(new_state)+" Current:"+str(state))
+        if state == "Recovery":
+            callChangeStateService(new_state)
+        else:
+            callChangeStateService("Recovery")
 
     params = delta.get("params")
     if params and dynManager:
@@ -50,7 +93,7 @@ def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Recon
 
 # Init dynamic reconfigration
 rospy.init_node("aws_iot_bridge", anonymous = True)
-#rospy.Subscriber("/state", String, stateListnshadowRegisterDeltaCallbacker)
+rospy.Subscriber("/state", String, stateListener)
 
 
 dyn_config  = rospy.get_param("~dyn_reconf_args",os.path.dirname(__file__) + '/' + "../config/skelton.yaml") 

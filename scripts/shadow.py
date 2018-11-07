@@ -151,23 +151,17 @@ class shadowSyncClient:
 
     # Custom Shadow callback
     def __deltaCallback(self, data, responseStatus, token):
-        if responseStatus == "timeout":
-            self.online = False
-            rospy.logwarn("Get request " + token + " time out!")
+        rospy.loginfo("Delta callback "+str(responseStatus))
 
-        if responseStatus == "rejected":
-            rospy.logwarn("Get request " + token + " rejected!") 
-
-        if responseStatus == "accepted":
-            if self.enable_delta_callback == False:
-                return
-            # payload is a JSON string ready to be parsed using json.loads(...)
-            payload = json.loads(data)
-            if payload.has_key("state"):
-                delta    = payload.get("state")
-                if delta:
-                    rospy.logdebug("Shadow Delta Callback is fired.")
-                    self.callback(self,delta)
+        if self.enable_delta_callback == False:
+            return
+        # payload is a JSON string ready to be parsed using json.loads(...)
+        payload = json.loads(data)
+        if payload.has_key("state"):
+            delta    = payload.get("state")
+            if delta:
+                rospy.logdebug("Shadow Delta Callback is fired.")
+                self.callback(self,delta)
     
     def __getCallback(self,data,responseStatus,token):
 
