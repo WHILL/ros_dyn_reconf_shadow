@@ -6,6 +6,7 @@ from pprint import pprint
 import threading
 
 import sys
+from time import sleep
 
 import dynamic_reconfigure.client
 
@@ -32,7 +33,8 @@ class dynClient:
 
 
     def connection_thread_process(self):
-        while True:
+        rate = rospy.Rate(1.0/3.0)
+        while True and not rospy.is_shutdown():
             try:
                 self.__client   = dynamic_reconfigure.client.Client(self.name, timeout=30)
 
@@ -46,7 +48,9 @@ class dynClient:
 
             except:
                 # When connection timeout, retry.
-                rospy.logwarn("Trying to reconnect dyn server:"+str(self.name))
+                #rospy.logwarn()
+                #print("Trying to reconnect dyn server:"+str(self.name))
+                rate.sleep()
 
     def is_connected(self):
         if self.__status == "Connected":

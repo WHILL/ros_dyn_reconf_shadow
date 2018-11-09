@@ -7,6 +7,7 @@ import traceback
 from time import sleep
 import yaml
 from datetime import datetime
+
 # ROSpy and dynamic reconfigration
 import rospy
 from std_msgs.msg import String
@@ -28,6 +29,8 @@ def callChangeStateService(state):
 
 
 state = None
+
+
 def stateListener(data):
 
     try:
@@ -48,6 +51,19 @@ def stateListener(data):
         pass
     
 
+def stateReportAndDesireListner(data):
+    rospy.logwarn(data)
+    try:
+        global state
+        global shadow
+        if shadow.online and (state != data.data or (datetime.now() - stateListener.timestamp_before).total_seconds() > 5):
+            rospy.loginfo(' state:'+str(data.data))
+            shadow.report_and_desire({'state':data.data})
+            state = data.data
+    except:
+        pass
+
+
 
 def shadowDeltaCallback(self,delta):  # Callback for Thing Shadow Receives Delta
 
@@ -55,10 +71,7 @@ def shadowDeltaCallback(self,delta):  # Callback for Thing Shadow Receives Delta
     if new_state:
         global state
         rospy.loginfo("State delta:"+str(new_state)+" Current:"+str(state))
-        if state == "Recovery":
-            callChangeStateService(new_state)
-        else:
-            callChangeStateService("Recovery")
+        state_delta_pub.publish(str(new_state))
 
     params = delta.get("params")
     if params and dynManager:
@@ -88,11 +101,12 @@ def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Recon
         rospy.logwarn("Shadow is not configured yet")
 
 
+state_delta_pub = rospy.Publisher("state/delta",String)
 
 # Init dynamic reconfigration
 rospy.init_node("aws_iot_bridge", anonymous = True)
 rospy.Subscriber("/state", String, stateListener)
-
+rospy.Subscriber("state/report_and_desire",String,stateReportAndDesireListner)
 
 dyn_config  = rospy.get_param("~dyn_reconf_args",os.path.dirname(__file__) + '/' + "../config/skelton.yaml") 
 
