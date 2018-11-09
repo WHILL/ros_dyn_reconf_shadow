@@ -1,7 +1,7 @@
 dyn_reconfigures:
-  joy_mux:
+  /joy_mux/mux:
     - manual_control
-  autonomous_op:
+  /state_manager/autonomous_op:
     - goal_position_x
     - goal_position_y
     - goal_orientation_z

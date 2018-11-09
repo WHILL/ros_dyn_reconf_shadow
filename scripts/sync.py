@@ -101,11 +101,12 @@ def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Recon
         rospy.logwarn("Shadow is not configured yet")
 
 
-state_delta_pub = rospy.Publisher("state/delta",String,queue_size=10)
 
 # Init dynamic reconfigration
 rospy.init_node("aws_iot_bridge", anonymous = True)
-rospy.Subscriber("/state", String, stateListener)
+
+state_delta_pub = rospy.Publisher("state/delta",String,queue_size=10)
+rospy.Subscriber("state/report", String, stateListener)
 rospy.Subscriber("state/report_and_desire",String,stateReportAndDesireListner)
 
 dyn_config  = rospy.get_param("~dyn_reconf_args",os.path.dirname(__file__) + '/' + "../config/skelton.yaml") 
