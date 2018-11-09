@@ -52,7 +52,7 @@ def stateListener(data):
     
 
 def stateReportAndDesireListner(data):
-    rospy.logwarn(data)
+
     try:
         global state
         global shadow
@@ -101,7 +101,7 @@ def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Recon
         rospy.logwarn("Shadow is not configured yet")
 
 
-state_delta_pub = rospy.Publisher("state/delta",String)
+state_delta_pub = rospy.Publisher("state/delta",String,queue_size=10)
 
 # Init dynamic reconfigration
 rospy.init_node("aws_iot_bridge", anonymous = True)
@@ -139,6 +139,8 @@ while not rospy.is_shutdown():
         while not shadow.online and not rospy.is_shutdown():
             rospy.loginfo("Still waiting...")
             waiting_rate.sleep()
+
+        shadow.desire({'state':None})
 
         rospy.loginfo("Registering to Dynamic Reconfigure Server.")
         dynManager = dynClientsManager(dynCallback)
