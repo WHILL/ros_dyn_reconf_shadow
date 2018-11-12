@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 '''
 /*
  * Copyright 2010-2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
@@ -17,186 +15,164 @@
  */
  '''
 
-import os
-
-# AWS Iot
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
-import logging
-import time
 import json
-import argparse
-
-
-# ROSpy and dynamic reconfigration
+import logging
 import rospy
 
-from dynamic_reconfigure.server import Server
+class shadowSyncClient:
 
+    def __init__(self,args,callback,connection_callback=None):
 
-# Custom Shadow callback
-def customShadowCallback_Update(payload, responseStatus, token):
-    # payload is a JSON string ready to be parsed using json.loads(...)
-    # in both Py2.x and Py3.x
-    if responseStatus == "timeout":
-        print("Update request " + token + " time out!")
-    if responseStatus == "accepted":
-        payloadDict = json.loads(payload)
-        print("~~~~~~~~~~~~~~~~~~~~~~~")
-        print("Update request with token: " + token + " accepted!")
-        print("property: " + str(payloadDict["state"]))
-        print("~~~~~~~~~~~~~~~~~~~~~~~\n\n")
-    if responseStatus == "rejected":
-        print("Update request " + token + " rejected!")
+        # Read in command-line parameters
 
-class shadowCallbackContainer:
-    def __init__(self, deviceShadowInstance):
-        self.deviceShadowInstance = deviceShadowInstance
+        host            = args.get("host")
+        port            = args.get("port")
+        useWebsocket    = args.get("useWebsocket")
+        thingName       = args.get("thingName")
+        clientId        = args.get("cliendID")
+        certificatePath = args.get("certificatePath")
+        privateKeyPath  = args.get("privateKeyPath")
+        rootCAPath      = args.get("rootCAPath")
 
-    def customShadowGetCallback(self, payload, responseStatus, token):
-        print("Received Shadow Get response:")
-        payloadDict = json.loads(payload)
-    
-        if(not payloadDict["state"].has_key("delta")):
-            print("delta is empty")
+        if useWebsocket and certificatePath and privateKeyPath:
+            rospy.logfatal("X.509 cert authentication and WebSocket are mutual exclusive. Please pick one.")
+            exit(2)
+
+        if not useWebsocket and (not certificatePath or not privateKeyPath):
+            rospy.logfatal("Missing credentials for authentication.")
+            exit(2)
+
+        # Port defaults
+        if useWebsocket and not port:  # When no port override for WebSocket, default to 443
+            port = 443
+        if not useWebsocket and not port:  # When no port override for non-WebSocket, default to 8883
+            port = 8883
+
+        # Configure logging
+        logger = logging.getLogger("AWSIoTPythonSDK.core")
+        logger.setLevel(logging.DEBUG)
+        streamHandler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        streamHandler.setFormatter(formatter)
+        #logger.addHandler(streamHandler)
+
+        # Init AWSIoTMQTTShadowClient
+        self.__myAWSIoTMQTTShadowClient = None
+        if useWebsocket:
+            self.__myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient(clientId, useWebsocket=True)
+            self.__myAWSIoTMQTTShadowClient.configureEndpoint(host, port)
+            self.__myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath)
         else:
-            delta = payloadDict["state"]["delta"]
+            self.__myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient(clientId)
+            self.__myAWSIoTMQTTShadowClient.configureEndpoint(host, port)
+            self.__myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath, privateKeyPath, certificatePath)
 
-            newPayload = '{"state":{"reported":' + json.dumps(delta) + '}}'
+        # AWSIoTMQTTShadowClient configuration
+        self.__myAWSIoTMQTTShadowClient.configureAutoReconnectBackoffTime(1, 32, 20)
+        self.__myAWSIoTMQTTShadowClient.configureConnectDisconnectTimeout(10)  # 10 sec
+        self.__myAWSIoTMQTTShadowClient.configureMQTTOperationTimeout(5)  # 5 sec
 
-            if delta.has_key('params'):
-                if srv:
-                    srv.update_configuration(delta['params'])
-                    #self.deviceShadowInstance.shadowUpdate(newPayload, None, 5)
-                print("Sent.")
-            
-        
-    # Custom Shadow callback
-    def customShadowCallback_Delta(self, payload, responseStatus, token):
+        # Connect to AWS IoT
+        self.__myAWSIoTMQTTShadowClient.connect()
+
+        self.callback = callback
+        self.connection_callback = connection_callback
+
+        self.online = False
+
+        # Create a deviceShadow with persistent subscription
+        self.handler = self.__myAWSIoTMQTTShadowClient.createShadowHandlerWithName(thingName, True)
+        self.handler.shadowRegisterDeltaCallback(self.__deltaCallback)
+        self.__myAWSIoTMQTTShadowClient.onOnline = self.__online_callback
+        self.__myAWSIoTMQTTShadowClient.onOffline = self.__offline_callback 
+
+        self.__myAWSIoTMQTTShadowClient.connect()
+
+        self.__reported = None
+
+    def __online_callback(self):
+        rospy.loginfo("AWS IoT Online")
+        self.online = True
+        if self.connection_callback:
+            self.connection_callback(self,self.online)
+    
+    def __offline_callback(self):
+        rospy.logwarn("AWS IoT Offline")
+        self.online = False
+        if self.connection_callback:
+            self.connection_callback(self,self.online)
+
+    def get(self):
+        self.handler.shadowGet(self.__getCallback, 5)
+
+    def report_and_desire(self,params):
+        state = {'reported':params,'desired':params}
+        self.__update(state)
+
+    def report(self,reported):
+        if reported != self.__reported:
+            state = {'reported':reported}
+            self.__update(state)
+    
+    def desire(self,desired):
+        state = {'desired':desired}
+        self.__update(state)
+
+    def __update(self,state):
+        rospy.loginfo("Updating Shadow to " + str(state))
+        data = json.dumps({'state':state})
+        self.handler.shadowUpdate(data, self.__updateCallback, 5)
+
+    def __updateCallback(self, data, responseStatus, token):
         # payload is a JSON string ready to be parsed using json.loads(...)
         # in both Py2.x and Py3.x
-        print("Received a delta message:")
-        payloadDict = json.loads(payload)
-        deltaMessage = json.dumps(payloadDict["state"])
 
-        if payloadDict["state"].has_key('params'):
-            params = payloadDict["state"]["params"]
-            
-            print(payloadDict["state"]["params"])
+        if responseStatus == "timeout":
+            self.online = False
+            rospy.logwarn("Update request " + token + " time out!")
 
-            print(payloadDict)
-            srv.update_configuration(payloadDict["state"]["params"])
-            #self.deviceShadowInstance.shadowUpdate(newPayload, None, 5)
-            print("Sent.")
+        if responseStatus == "rejected":
+            rospy.logwarn("Update request " + token + " rejected!") 
+
+        if responseStatus == "accepted":
+            rospy.logdebug("Shadow update request accepted:")
+            payload = json.loads(data)
+            state = payload["state"]
+            reported = state.get("reported")
+            if reported:
+                self.__reported = state.get("reported")
 
 
-def dynReconfigureCallback(config, level):
+    # Custom Shadow callback
+    def __deltaCallback(self, data, responseStatus, token):
+
+        # payload is a JSON string ready to be parsed using json.loads(...)
+        payload = json.loads(data)
+        if payload.has_key("state"):
+            delta    = payload.get("state")
+            if delta:
+                rospy.logdebug("Shadow Delta Callback is fired.")
+                self.callback(self,delta)
     
-    params = {}
-    for key in config.groups.parameters:
-        params[key] = config[key]
+    def __getCallback(self,data,responseStatus,token):
 
-    state = {}
-    state["reported"] = {"params":params}
+        if responseStatus == "timeout":
+            self.online = False
+            rospy.logwarn("Get request " + token + " time out!")
 
-    if not (level == -1):  # Not Self Initialization
-        desired = {"params":params}
-        state["desired"] = desired
+        if responseStatus == "rejected":
+            rospy.logwarn("Get request " + token + " rejected!") 
 
-    try:
-        deviceShadowHandler.shadowUpdate(json.dumps({"state":state}), customShadowCallback_Update, 5)
-    except:
-        rospy.loginfo("deviceShadowHandler is not declared yet")
+        if responseStatus == "accepted":
 
-    return config
+            payload = json.loads(data)
+            self.has_initialized = True
 
-
-
-
-def connectDeviceShadow(args):
-
-    # Read in command-line parameters
-
-    host            = args.get("host")
-    port            = args.get("port")
-    useWebsocket    = args.get("useWebsocket")
-    thingName       = args.get("thingName")
-    clientId        = args.get("cliendID")
-    certificatePath = args.get("certificatePath")
-    privateKeyPath  = args.get("privateKeyPath")
-    rootCAPath      = args.get("rootCAPath")
-
-    if useWebsocket and certificatePath and privateKeyPath:
-        rospy.logfatal("X.509 cert authentication and WebSocket are mutual exclusive. Please pick one.")
-        exit(2)
-
-    if not useWebsocket and (not certificatePath or not privateKeyPath):
-        rospy.logfatal("Missing credentials for authentication.")
-        exit(2)
-
-    # Port defaults
-    if useWebsocket and not port:  # When no port override for WebSocket, default to 443
-        port = 443
-    if not useWebsocket and not port:  # When no port override for non-WebSocket, default to 8883
-        port = 8883
-
-    # Configure logging
-    logger = logging.getLogger("AWSIoTPythonSDK.core")
-    logger.setLevel(logging.DEBUG)
-    streamHandler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    streamHandler.setFormatter(formatter)
-    logger.addHandler(streamHandler)
-
-    # Init AWSIoTMQTTShadowClient
-    myAWSIoTMQTTShadowClient = None
-    if useWebsocket:
-        myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient(clientId, useWebsocket=True)
-        myAWSIoTMQTTShadowClient.configureEndpoint(host, port)
-        myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath)
-    else:
-        myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient(clientId)
-        myAWSIoTMQTTShadowClient.configureEndpoint(host, port)
-        myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath, privateKeyPath, certificatePath)
-
-    # AWSIoTMQTTShadowClient configuration
-    myAWSIoTMQTTShadowClient.configureAutoReconnectBackoffTime(1, 32, 20)
-    myAWSIoTMQTTShadowClient.configureConnectDisconnectTimeout(10)  # 10 sec
-    myAWSIoTMQTTShadowClient.configureMQTTOperationTimeout(5)  # 5 sec
-
-    # Connect to AWS IoT
-    myAWSIoTMQTTShadowClient.connect()
-
-    # Create a deviceShadow with persistent subscription
-    global deviceShadowHandler
-    deviceShadowHandler = myAWSIoTMQTTShadowClient.createShadowHandlerWithName(thingName, True)
-    global shadowCallbackContainer_Bot
-    shadowCallbackContainer_Bot = shadowCallbackContainer(deviceShadowHandler)
-
-
-
-# Init dynamic reconfigration
-rospy.init_node("aws_iot_bridge", anonymous = True)
-
-args = {}
-
-args["host"]            = rospy.get_param("~host")
-args["port"]            = rospy.get_param("~port",None)
-args["useWebsocket"]    = rospy.get_param("~useWebsocket",None)
-args["thingName"]       = rospy.get_param("~thingName")
-args["clientId"]        = rospy.get_param("~clientId","ROS")
-args["certificatePath"] = rospy.get_param("~certificatePath", os.path.dirname(__file__) + '/' + "../certs/certificate.pem.crt")
-args["privateKeyPath"]  = rospy.get_param("~privateKeyPath", os.path.dirname(__file__) + '/' + "../certs/private.pem.key")
-args["rootCAPath"]      = rospy.get_param("~rootCAPath",os.path.dirname(__file__) + '/' + "../certs/rootCA.pem")
-
-connectDeviceShadow(args)
-
-from ros_aws_iot_bridge.cfg import sampleConfig as DynParams
-srv = Server(DynParams, dynReconfigureCallback)
-
-deviceShadowHandler.shadowGet(shadowCallbackContainer_Bot.customShadowGetCallback, 5)
-
-# Listen on deltas
-deviceShadowHandler.shadowRegisterDeltaCallback(shadowCallbackContainer_Bot.customShadowCallback_Delta)
-
-
-rospy.spin()
+            if payload.has_key("state"):
+                state = payload["state"]
+                self.__reported = state.get("reported")
+                delta = state.get("delta")
+                if delta:
+                    self.callback(self,delta)
+                

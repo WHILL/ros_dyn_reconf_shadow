@@ -89,9 +89,9 @@ find_package(catkin REQUIRED COMPONENTS
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-  cfg/sample.cfg
-)
+#generate_dynamic_reconfigure_options(
+#  cfg/Tutorials.cfg
+#)
 
 ###################################
 ## catkin specific configuration ##

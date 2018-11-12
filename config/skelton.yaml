@@ -1,0 +1,7 @@
+dyn_reconfigures:
+  dynamic_tutorials/testServer1:
+    - int_param
+    - str_param
+    - double_param
+  dynamic_tutorials/testServer2:
+    - double_param

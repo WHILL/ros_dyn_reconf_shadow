@@ -1,8 +1,11 @@
 <launch>
 
-    <node pkg="ros_aws_iot_bridge" name="shadow" type="shadow.py" output="screen">
-        <param name="host" value="afikasltww6e2.iot.ap-northeast-1.amazonaws.com" />
-        <param name="thingName" value="WHILL" />
-    </node>
+    <group ns="shadow">
+        <node pkg="ros_aws_iot_bridge" name="sync" type="sync.py" output="screen">
+            <param name="host" value="afikasltww6e2.iot.ap-northeast-1.amazonaws.com" />
+            <param name="thingName" value="WHILL" />
+            <param name="dyn_reconf_args" value="$(find ros_aws_iot_bridge)/config/whill-system.yaml"/>
+        </node>
+    </group>
 
 </launch>
