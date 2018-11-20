@@ -146,8 +146,8 @@ while not rospy.is_shutdown():
         rospy.loginfo("Registering to Dynamic Reconfigure Server.")
         dynManager = dynClientsManager(dynCallback)
 
-        for name,args in dyn_configs.items():
-            dynManager.add(name,args)
+        for dyn_name,dyn_args in dyn_configs.items():
+            dynManager.add(dyn_name,dyn_args)
 
         r = rospy.Rate(1.0/5.0)
         while not rospy.is_shutdown():
