@@ -1,10 +1,15 @@
 # ros_aws_iot_bridge
 Sync parameters with AWS IoT ThingShadow by Dynamic Reconfigure Interface
 
-
 ## Build and Install
 
 Clone this repository and place on your `catkin_ws`, and then build.
+
+### Dependencies
+```
+rosdep install ros_aws_iot_bridge
+```
+
 
 ## Run
 
