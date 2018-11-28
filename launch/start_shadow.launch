@@ -1,0 +1,12 @@
+<launch>
+    
+    <include file="$(find ros_aws_iot_bridge)/launch/shadow.launch">
+
+        <arg name="certificatePath" value="$(env HOME)/.awsiot/certs/certificate.pem.crt"/>
+        <arg name="privateKeyPath" value="$(env HOME)/.awsiot/certs/private.pem.key"/>
+        <arg name="rootCAPath" value="$(env HOME)/.awsiot/certs/rootCA.pem"/>
+        <arg name="thingName" value="$(env AWSIOT_THINGNAME)"/>
+
+    </include>
+
+</launch>
