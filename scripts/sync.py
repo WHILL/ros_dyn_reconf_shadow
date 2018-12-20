@@ -10,7 +10,7 @@ from datetime import datetime
 
 # ROSpy and dynamic reconfigration
 import rospy
-from std_msgs.msg import String
+from std_msgs.msg import String,Bool
 from std_srvs.srv import *
 
 
@@ -100,13 +100,20 @@ def dynCallback(self,name,config,isInitial):   # Callback for when Dynamic Recon
     except NameError:
         rospy.logwarn("Shadow is not configured yet")
 
-
+def timer_callback(event):
+    try:
+        global shadow
+        shadow_state_pub.publish(shadow.online)
+    except:
+        pass
 
 # Init dynamic reconfigration
 rospy.init_node("aws_iot_bridge", anonymous = True)
 
 state_delta_pub = rospy.Publisher("state/delta",String,queue_size=10)
+shadow_state_pub = rospy.Publisher("online",Bool,queue_size=10)
 rospy.Subscriber("state/report", String, stateListener)
+
 rospy.Subscriber("state/report_and_desire",String,stateReportAndDesireListner)
 
 dyn_config  = rospy.get_param("~dyn_reconf_args",os.path.dirname(__file__) + '/' + "../config/skelton.yaml") 
@@ -130,6 +137,8 @@ args["rootCAPath"]      = rospy.get_param("~rootCAPath",os.path.dirname(__file__
 
 
 while not rospy.is_shutdown():
+
+    rospy.Timer(rospy.Duration(0.1), timer_callback)
 
     try:
         rospy.loginfo("Waiting for AWS IoT connection.")
@@ -162,4 +171,4 @@ while not rospy.is_shutdown():
         t, v, tb = sys.exc_info()
         rospy.logerr(traceback.format_exception(t,v,tb))
         rospy.logwarn("Retrying soon..")
-        sleep(5)
+        sleep(1)
