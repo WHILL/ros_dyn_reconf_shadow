@@ -57,15 +57,17 @@ def stateReportAndDesireListner(data):
         global state
         global shadow
         if shadow.online and (state != data.data or (datetime.now() - stateListener.timestamp_before).total_seconds() > 5):
-            rospy.loginfo(' state:'+str(data.data))
-            shadow.report_and_desire({'state':data.data})
+            new_state = data.data
+            if new_state == "":
+                new_state = None
+            shadow.report_and_desire({'state':new_state})
             state = data.data
     except:
         pass
 
 
 
-def shadowDeltaCallback(self,delta):  # Callback for Thing Shadow Receives Delta
+def shadowDeltaCallback(self,delta):  # Callback for Thing Shadow Receives Delta
 
     new_state = delta.get("state")
     if new_state:
