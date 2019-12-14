@@ -1,5 +1,7 @@
 # dyn_reconf_shadow
 Sync Dynamic Reconfigure Parameters with AWS IoT ThingShadow
+<img src="https://user-images.githubusercontent.com/2618822/70847797-1a240d80-1eac-11ea-9845-466ca876eacb.png" width=80%/>
+
 
 ## Build and Install
 
