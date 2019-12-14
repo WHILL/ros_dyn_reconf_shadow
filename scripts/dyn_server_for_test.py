@@ -11,7 +11,7 @@ def callback(config, level):
     return config
 
 if __name__ == "__main__":
-    rospy.init_node("dynamic_tutorials", anonymous = False)
+    rospy.init_node("sample_dyn_server", anonymous = False)
 
     srv1 = Server(TutorialsConfig, callback,namespace="testServer1")
     srv2 = Server(TutorialsConfig, callback,namespace="testServer2")
