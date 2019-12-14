@@ -1,4 +1,4 @@
-# ros_awsiot_thingshadow
+# dyn_reconf_shadow
 Sync Dynamic Reconfigure Parameters with AWS IoT ThingShadow
 
 ## Build and Install
@@ -7,7 +7,7 @@ Clone this repository and place on your `catkin_ws`, and then build.
 
 ### Dependencies
 ```
-rosdep install ros_awsiot_thingshadow
+rosdep install dyn_reconf_shadow
 ```
 
 
