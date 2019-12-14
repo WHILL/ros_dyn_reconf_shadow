@@ -3,7 +3,7 @@
 import rospy
 
 from dynamic_reconfigure.server import Server
-from dynamic_tutorials.cfg import TutorialsConfig
+from ros_awsiot_thingshadow.cfg import TutorialsConfig
 
 def callback(config, level):
     rospy.loginfo("""Reconfigure Request: {int_param}, {double_param},\ 

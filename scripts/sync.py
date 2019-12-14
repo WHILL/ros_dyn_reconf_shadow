@@ -116,7 +116,7 @@ rospy.Subscriber("state/report", String, stateListener)
 
 rospy.Subscriber("state/report_and_desire",String,stateReportAndDesireListner)
 
-dyn_config  = rospy.get_param("~dyn_reconf_args",os.path.dirname(__file__) + '/' + "../config/skelton.yaml") 
+dyn_config  = rospy.get_param("~dyn_reconf_args") 
 
 rospy.loginfo(dyn_config)
 with open(dyn_config, 'rt') as fp:
@@ -131,9 +131,9 @@ args["port"]            = rospy.get_param("~port",None)
 args["useWebsocket"]    = rospy.get_param("~useWebsocket",None)
 args["thingName"]       = rospy.get_param("~thingName")
 args["clientId"]        = rospy.get_param("~clientId","ROS")
-args["certificatePath"] = rospy.get_param("~certificatePath", os.path.dirname(__file__) + '/' + "../certs/certificate.pem.crt")
-args["privateKeyPath"]  = rospy.get_param("~privateKeyPath", os.path.dirname(__file__) + '/' + "../certs/private.pem.key")
-args["rootCAPath"]      = rospy.get_param("~rootCAPath",os.path.dirname(__file__) + '/' + "../certs/rootCA.pem")
+args["certificatePath"] = rospy.get_param("~certificatePath", "~/.awsiot/certificate.pem.crt")
+args["privateKeyPath"]  = rospy.get_param("~privateKeyPath", "~/.awsiot/private.pem.key")
+args["rootCAPath"]      = rospy.get_param("~rootCAPath","~/.awsiot/AmazonRootCA1.pem")
 
 
 while not rospy.is_shutdown():

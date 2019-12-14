@@ -1,7 +1,7 @@
 dyn_reconfigures:
-  dynamic_tutorials/testServer1:
+  /sample_dyn_server/testServer1:
     - int_param
     - str_param
     - double_param
-  dynamic_tutorials/testServer2:
+  /sample_dyn_server/testServer2:
     - double_param
