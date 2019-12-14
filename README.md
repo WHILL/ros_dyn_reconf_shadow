@@ -14,7 +14,7 @@ rosdep install ros_awsiot_thingshadow
 ## Run
 
 ```
-rosrun reconf_shadow sync.py
+rosrun dyn_reconf_shadow sync.py _host:=<hostname> _thingName:=<thingname> _reconf_config:=<config yaml file path>
 ```
 
 ## Parameters
@@ -40,7 +40,7 @@ Root Certification for Amazon
 ### ~port (string, default: None)
 No need to change normally.
 
-## ~dyn_reconf_args(Required, string)
+## ~reconf_config(Required, string)
 Config file yaml of reconfigure server name and factors to sync.
 See sample yaml: `config/sample-config.yaml`
 
