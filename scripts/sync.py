@@ -122,6 +122,8 @@ rospy.loginfo(dyn_config)
 with open(dyn_config, 'rt') as fp:
     yaml_text = fp.read()
 
+print(yaml_text)
+
 dyn_configs = yaml.safe_load(yaml_text).get("dyn_reconfigures")
 
 
@@ -131,10 +133,11 @@ args["port"]            = rospy.get_param("~port",None)
 args["useWebsocket"]    = rospy.get_param("~useWebsocket",None)
 args["thingName"]       = rospy.get_param("~thingName")
 args["clientId"]        = rospy.get_param("~clientId","ROS")
-args["certificatePath"] = rospy.get_param("~certificatePath", "~/.awsiot/certificate.pem.crt")
-args["privateKeyPath"]  = rospy.get_param("~privateKeyPath", "~/.awsiot/private.pem.key")
-args["rootCAPath"]      = rospy.get_param("~rootCAPath","~/.awsiot/AmazonRootCA1.pem")
+args["certificatePath"] = rospy.get_param("~certificatePath", os.path.join(str(os.environ['HOME']),".awsiot/certificate.pem.crt"))
+args["privateKeyPath"]  = rospy.get_param("~privateKeyPath", os.path.join(str(os.environ['HOME']), ".awsiot/private.pem.key"))
+args["rootCAPath"]      = rospy.get_param("~rootCAPath", os.path.join(str(os.environ['HOME']),".awsiot/AmazonRootCA1.pem"))
 
+print(os.environ['HOME'])
 
 while not rospy.is_shutdown():
 
